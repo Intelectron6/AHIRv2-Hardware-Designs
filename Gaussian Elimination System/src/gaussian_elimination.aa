@@ -1,0 +1,147 @@
+$pipe input_data: $float<8,23> $depth 2
+$pipe output_data: $float<8,23> $depth 2
+$storage A: $array[16][17] $of $float<8,23>
+$storage x: $array[16] $of $float<8,23>
+$constant N : $uint<8> := 16
+
+$module [fpd] $in (n d: $float<8,23>) $out (q: $float<8,23>) $is
+{
+    d1 := ($slice ($bitcast ($uint<32>) d) 31 23)
+    init_int := ((254 - d1) && $zero<23>)
+    init_float := ($bitcast ($float<8,23>) init_int)
+
+    $branchblock[loop] 
+    {
+        $merge $entry loopback
+            $phi j := _f1.0000e+0 $on $entry next_j $on loopback
+            $phi r := init_float $on $entry next_r $on loopback
+            $phi count := $zero<4> $on $entry next_count $on loopback
+        $endmerge
+        
+        $volatile next_count := (count + 1)
+
+        next_r := (r * (_f2.0000e+0 - (d * r)))
+
+        next_j := ($mux (r > next_r) (r - next_r) (next_r - r))
+
+        $if (j > _f1.0000e-7) $then
+            $if (count < 15) $then
+                $place[loopback]
+            $endif
+        $endif
+
+    }(r => r count => count)
+
+    q := (n * r)
+}
+
+$module [ge] $in () $out () $is
+{
+    $branchblock[loop0] 
+    {
+        $merge $entry loopback1
+            $phi t := $zero<8> $on $entry nt $on loopback1
+        $endmerge
+
+            $dopipeline $depth 8 $fullrate
+            $merge $entry $loopback
+                $phi q := $zero<8> $on $entry nq $on $loopback
+            $endmerge
+        
+            $volatile nq := (q + 1) 
+        
+            A[t][q] := input_data
+            $while (q < N)
+        
+        $volatile nt := (t + 1)
+
+        $if (t < (N-1)) $then
+            $place[loopback1]
+        $endif
+    }
+
+    $branchblock[loop1]
+    {
+        $merge $entry loopback1
+            $phi i := $zero<8> $on $entry ni $on loopback1
+        $endmerge
+        
+        $volatile ni := (i + 1)
+
+        $branchblock[loop2]
+        {
+            $merge $entry loopback2
+                $phi j := (i + 1) $on $entry nj $on loopback2
+            $endmerge
+            
+            $volatile nj := (j + 1)
+
+            $call fpd (A[j][i] A[i][i]) (ratio)
+
+                $dopipeline $depth 16 $fullrate
+                $merge $entry $loopback
+                    $phi k := (i + 1) $on $entry nk $on $loopback
+                $endmerge
+            
+                $volatile nk := (k + 1)
+       
+                A[j][k] := (A[j][k] - (ratio * A[i][k]))
+
+                $while (k < N)
+    
+            $if (j < (N-1)) $then
+                $place[loopback2]
+            $endif
+        }
+            
+        $if (i < (N-2)) $then
+            $place[loopback1]
+        $endif
+    }
+
+    $call fpd (A[(N-1)][N] A[(N-1)][(N-1)]) (xl)
+    x[(N-1)] := xl
+    
+    $branchblock[loop4]
+    {
+        $merge $entry loopback4
+            $phi r := (N - 2) $on $entry nr $on loopback4
+        $endmerge
+        
+        $volatile nr := (r - 1)
+        x[r] := A[r][N]
+        
+            $dopipeline $depth 16 $fullrate
+            $merge $entry $loopback
+                $phi s := (r + 1) $on $entry ns $on $loopback
+            $endmerge
+            
+            $volatile ns := (s + 1)
+
+            x[r] := (x[r] - (A[r][s] * x[s]))
+
+            $while (s < N)
+    
+        term1 := x[r]
+        term2 := A[r][r]
+        $call fpd (term1 term2) (xr)
+        x[r] := xr
+        
+        $if (r > 0) $then
+            $place[loopback4]
+        $endif
+    }
+
+    $branchblock[loop6] 
+    {
+        $dopipeline $depth 8 $fullrate
+        $merge $entry $loopback
+            $phi p := $zero<8> $on $entry np $on $loopback
+        $endmerge
+        
+        $volatile np := (p + 1)   
+        output_data := x[p]
+        
+        $while (p < (N-1))
+    }
+}
