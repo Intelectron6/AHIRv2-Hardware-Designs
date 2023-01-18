@@ -1,0 +1,36 @@
+$constant RST: $uint<2> := 0
+$constant LOOPING: $uint<2> := 1
+$constant DONE: $uint<2> := 2
+
+$module [ssd] $in (n d: $uint<8>) $out (q r: $uint<8>) $is
+{
+    $branchblock[loop]
+    {
+        $merge $entry loopback
+            $phi present_state := RST $on $entry next_state $on loopback
+            $phi rr := $zero<8> $on $entry next_rr $on loopback
+            $phi qr := $zero<8> $on $entry next_qr $on loopback
+            $phi counter := 7 $on $entry next_counter $on loopback
+        $endmerge
+
+        next_state := ($excmux  (present_state == RST)  LOOPING
+                                (present_state == LOOPING) ($mux (counter == 0) DONE LOOPING)
+                                (present_state == DONE) DONE)
+
+        exp1 := ($concat ($slice rr 6 0) (n [] counter))
+    
+        next_rr := ($mux (present_state == LOOPING) ($mux (exp1 >= d) (exp1 - d) exp1) $zero<8>)
+
+        next_qr := ($mux (present_state == LOOPING) ($mux (exp1 >= d) ($concat ($slice qr 6 0) $one<1>) ($concat ($slice qr 6 0) $zero<1>)) $zero<8>) 
+
+        next_counter := ($mux (present_state == LOOPING)  (counter - 1)  counter)
+    
+        $if (present_state != DONE) $then
+            $place[loopback]
+        $endif
+    } (qr => qr rr => rr)
+
+    q := qr
+    r := rr
+    $rreport(ssd quorem n d q r)
+}
