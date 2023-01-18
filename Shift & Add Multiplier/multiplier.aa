@@ -1,0 +1,37 @@
+$constant RST: $uint<2> := 0
+$constant LOOPING: $uint<2> := 1
+$constant DONE: $uint<2> := 2
+
+$module [sam] $in (a b: $uint<8>) $out (p : $uint<16>) $is
+{
+    $branchblock[loop]
+    {
+        $merge $entry loopback
+            $phi present_state := RST $on $entry next_state $on loopback
+            $phi t := $zero<17> $on $entry next_t $on loopback
+            $phi ta := a $on $entry next_ta $on loopback
+            $phi counter := $zero<4> $on $entry next_counter $on loopback
+        $endmerge
+
+        next_state := ($excmux  (present_state == RST)  LOOPING
+                                (present_state == LOOPING) ($mux (counter == 9) DONE LOOPING)
+                                (present_state == DONE) DONE)
+
+        exp1 := (($zero<1> && ($slice t 16 9)) + ($zero<1> && b))
+        exp2 := ($slice t 8 1)
+        exp3 := (exp1 && exp2)
+ 
+        next_t := ($mux (present_state == LOOPING) ($mux (ta [] 0) exp3 ($zero<1> && ($slice t 16 1)))  t)
+
+        next_ta := ($mux (present_state == LOOPING)  ($zero<1> && ($slice ta 7 1))  ta)
+
+        next_counter := ($mux (present_state == LOOPING)  (counter + 1)  counter)
+    
+        $if (counter < 9) $then
+            $place[loopback]
+        $endif
+    } (t => t)
+
+    p := ($slice t 15 0)
+    $rreport(sam prod a b p)
+}
