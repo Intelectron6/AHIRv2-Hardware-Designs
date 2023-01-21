@@ -17,26 +17,26 @@ SW: aalink aa2c
 TO_C: aalink aa2c
 
 # Aa linking..
-aalink: $(SRC)/prog.aa 
-	AaLinkExtMem $(SRC)/prog.aa | vcFormat > prog.linked.aa
-	AaOpt -B prog.linked.aa | vcFormat > prog.linked.opt.aa
+aalink: $(SRC)/fir_filter.aa 
+	AaLinkExtMem $(SRC)/fir_filter.aa | vcFormat > fir_filter.linked.aa
+	AaOpt -B fir_filter.linked.aa | vcFormat > fir_filter.linked.opt.aa
 
 # Aa to C..  this produces aa_c_model* files which are compiled
 # with the testbench to produce an executable..
-aa2c:prog.linked.opt.aa
-	Aa2C -o ./ $(TOPMODULES) prog.linked.opt.aa  
+aa2c:fir_filter.linked.opt.aa
+	Aa2C -o ./ $(TOPMODULES) fir_filter.linked.opt.aa  
 	gcc -g -o testbench_sw -DSW -I ./ -I $(AHIR_INCLUDE)  aa_c_model.c src/testbench.c -L $(AHIR_LIB) -lPipeHandler -lpthread -l BitVectors -lSockPipes
 
 # the linked optimized Aa is converted to a vC model.
-aa2vc: prog.linked.opt.aa
-	Aa2VC -O -C prog.linked.opt.aa | vcFormat > prog.vc
+aa2vc: fir_filter.linked.opt.aa
+	Aa2VC -O -C prog.linked.opt.aa | vcFormat > fir_filter.vc
 
 
 # vC to VHDL
-vc2vhdl: prog.vc
+vc2vhdl: fir_filter.vc
 	rm -rf vhdl
 	mkdir vhdl
-	vc2vhdl -U -O -a -C -e ahir_system -w -s ghdl $(TOPMODULES) -f prog.vc 
+	vc2vhdl -U -O -a -C -e ahir_system -w -s ghdl $(TOPMODULES) -f fir_filter.vc 
 	vhdlFormat < ahir_system_global_package.unformatted_vhdl > vhdl/ahir_system_global_package.vhdl
 	vhdlFormat < ahir_system.unformatted_vhdl > vhdl/ahir_system.vhdl
 	vhdlFormat < ahir_system_test_bench.unformatted_vhdl > vhdl/ahir_system_test_bench.vhdl
