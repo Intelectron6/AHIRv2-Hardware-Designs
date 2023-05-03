@@ -1,5 +1,5 @@
 # AHIRv2-Hardware-Designs
-AHIRv2 is a tool-chain developed by Prof.MPD and his team at IIT Bombay. </br>
+AHIRv2 is a tool-chain developed by Prof. Madhav P Desai and his team at IIT Bombay. </br>
 The tool-chain is capable of converting algorithms written in high level language to synthesizable RTL description (VHDL code).
 It can also verify the synthesized hardware using C-testbench. </br>
 
