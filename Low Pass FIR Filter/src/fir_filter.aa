@@ -7,11 +7,10 @@ $pipe out_data: $float<8,23> $depth 2
 $storage FILTER_COEFFICIENTS: $array[ORDER] $of $float<8,23>
 $storage FILTER_SAMPLES: $array[ORDER] $of $float<8,23>
 
- 
-$module [getCoefficients] 
-	$in () $out () $is
+$module [getCoefficients] $in () $out () $is
 {
-	$branchblock[loop] {
+	$branchblock[loop]
+	{
 		$dopipeline $depth 7 $fullrate
 			$merge $entry $loopback
 				$phi I := $zero<LOG_ORDER> $on $entry nI $on $loopback
@@ -27,21 +26,23 @@ $module [getCoefficients]
 
 $module [filterDaemon] $in () $out () $is
 {
-  $call getCoefficients () ()
-  $rreport (filterDaemon got_coefficients)
+ 	$call getCoefficients () ()
+  	$rreport (filterDaemon got_coefficients)
 
-  $branchblock[loop] {
-	$dopipeline $depth 1
-		$merge $entry $loopback
-			$phi I := $zero<LOG_ORDER> $on $entry nI $on $loopback
-			$phi X := in_data $on $entry, $loopback
-		$endmerge
+  	$branchblock[loop] 
+  	{
+		$dopipeline $depth 1
+			$merge $entry $loopback
+				$phi I := $zero<LOG_ORDER> $on $entry nI $on $loopback
+				$phi X := in_data $on $entry, $loopback
+			$endmerge
 
 		$volatile nI := (I + 1)
 		$call runFilter (X I) (Y)
 		out_data := Y
-	$while 1
-  }
+		
+		$while 1
+  	}
 }
 
 
@@ -49,7 +50,7 @@ $module [runFilter] $in (X : $float<8,23> I:$uint<LOG_ORDER>) $out (R: $float<8,
 {
 	FILTER_SAMPLES[I] := X	
 	$branchblock[loop] 
-    {
+    	{
 		$dopipeline $depth 3
 		$merge $entry $loopback 
 			$phi J := $zero<LOG_ORDER> $on $entry nJ $on $loopback
@@ -58,18 +59,18 @@ $module [runFilter] $in (X : $float<8,23> I:$uint<LOG_ORDER>) $out (R: $float<8,
 		FC1 := FILTER_COEFFICIENTS[({ORDER - 1}-J)] 
 		FS1 := FILTER_SAMPLES[(J + (I + 1))]
 
-        FC2 := FILTER_COEFFICIENTS[({ORDER - 1}-(J + 1))] 
+        	FC2 := FILTER_COEFFICIENTS[({ORDER - 1}-(J + 1))] 
 		FS2 := FILTER_SAMPLES[((J + 1) + (I + 1))]
 
-        FC3 := FILTER_COEFFICIENTS[({ORDER - 1}-(J + 2))] 
+        	FC3 := FILTER_COEFFICIENTS[({ORDER - 1}-(J + 2))] 
 		FS3 := FILTER_SAMPLES[((J + 2) + (I + 1))]
 
-        FC4 := FILTER_COEFFICIENTS[({ORDER - 1}-(J + 3))] 
+       		FC4 := FILTER_COEFFICIENTS[({ORDER - 1}-(J + 3))] 
 		FS4 := FILTER_SAMPLES[((J + 3) + (I + 1))]
 
-        P1 := ((FC1*FS1) + (FC2*FS2))
-        P2 := ((FC3*FS3) + (FC4*FS4))
-        P3 := (P1 + P2)
+		P1 := ((FC1*FS1) + (FC2*FS2))
+		P2 := ((FC3*FS3) + (FC4*FS4))
+		P3 := (P1 + P2)
 
 		Y := (($mux (J==0) _f0.0e+0 Y) + P3)
 
