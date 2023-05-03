@@ -4,4 +4,4 @@ The tool-chain is capable of converting algorithms written in high level languag
 It can also verify the synthesized hardware using C-testbench. </br>
 
 This repository contains some hardware descriptions described using Algorithmic Assembly (Aa) Language. </br>
-Several of these are examples or assignments provided as part of the course EE789 at IITB, while few are born out of sheer desire to play around. 
+Several of these are examples or assignments provided as part of the course EE789 at IITB, while few are out of sheer desire to play around. 
