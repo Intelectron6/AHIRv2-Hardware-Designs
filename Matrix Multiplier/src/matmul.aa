@@ -1,0 +1,109 @@
+$pipe input_data: $uint<32> $depth 8
+$pipe output_data: $uint<32> $depth 8
+$storage A B C: $array[8][8] $of $uint<32>
+$constant N: $uint<4> := 8
+
+$module [matmul] $in () $out () $is
+{
+	$branchblock[loop1] 
+    {
+        $merge $entry loopback1
+            $phi t := $zero<4> $on $entry nt $on loopback1
+        $endmerge
+
+            $dopipeline $depth 8 $fullrate
+            $merge $entry $loopback
+                $phi q := $zero<4> $on $entry nq $on $loopback
+            $endmerge
+        
+		        $volatile nq := (q + 1) 
+		    
+		    	d := input_data
+		        A[t][q] := d
+		    
+		    $while (q < (N - 1))
+        
+        	$volatile nt := (t + 1)
+
+        $if (t < (N - 1)) $then $place[loopback1] $endif
+    }
+    
+    $branchblock[loop2] 
+    {
+        $merge $entry loopback2
+            $phi s := $zero<4> $on $entry ns $on loopback2
+        $endmerge
+
+            $dopipeline $depth 8 $fullrate
+            $merge $entry $loopback
+                $phi p := $zero<4> $on $entry np $on $loopback
+            $endmerge
+        
+		        $volatile np := (p + 1) 
+		    
+		    	e := input_data
+		        B[s][p] := e
+        
+        	$while (p < (N - 1))
+        
+        	$volatile ns := (s + 1)
+
+        $if (s < (N - 1)) $then $place[loopback2] $endif
+    }
+    
+	$branchblock[loopc] 
+	{
+    	$dopipeline $depth 32 $fullrate
+			$merge $entry $loopback
+				$phi I := $zero<4> $on $entry nI $on $loopback
+        		$phi J := $zero<4> $on $entry nJ $on $loopback
+        		$phi K := $zero<4> $on $entry nK $on $loopback
+      		$endmerge 
+      
+	      	$volatile $call Increment (I J K) (nI nJ nK)
+	      	$volatile $call AllDone (I J K)  (all_done)
+
+			$volatile first_one := (K == 0)
+      		$volatile last_one  := (K == (N - 1))
+
+      		sum := (($mux first_one 0 sum) + (A[I][K] * B[K][J]))
+			
+			$guard (last_one)  C[I][J] := sum
+			
+		$while (~all_done)
+	}
+	
+	$branchblock[loop3] 
+    {
+        $merge $entry loopback3
+            $phi u := $zero<4> $on $entry nu $on loopback3
+        $endmerge
+
+            $dopipeline $depth 8 $fullrate
+            $merge $entry $loopback
+                $phi r := $zero<4> $on $entry nr $on $loopback
+            $endmerge
+        
+		        $volatile nr := (r + 1) 
+		    
+		        output_data := C[u][r]
+		    
+		    $while (r < (N - 1))
+        
+        	$volatile nu := (u + 1)
+
+        $if (u < (N - 1)) $then $place[loopback3] $endif
+    }
+}
+
+$volatile $module [Increment] $in (I J K : $uint<4>) $out (nI nJ nK: $uint<4>) $is
+{
+	nK := ($mux (K == (N - 1)) 0 (K + 1))
+	nJ := ($mux ($reduce & (J == (N - 1)) (K == (N - 1))) 0 ($mux (K == (N - 1)) (J + 1) J))
+	nI := ($mux ($reduce & (J == (N - 1)) (K == (N - 1))) (I + 1) I)
+}
+
+$volatile $module [AllDone] $in (I J K: $uint<4>) $out (all_done: $uint<1>) $is
+{
+	all_done := ($reduce & (I == (N - 1)) (J == (N - 1)) (K == (N - 1)))
+}
